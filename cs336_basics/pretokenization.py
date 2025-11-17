@@ -1,5 +1,13 @@
 import os
-from typing import BinaryIO
+from typing import BinaryIO, Iterable
+import regex as re
+
+PAT = r"""'(?:[sdmt]|ll|ve|re)| ?\p{L}+| ?\p{N}+| ?[^\s\p{L}\p{N}]+|\s+(?!\S)|\s+"""
+
+
+def pretokenize(text: str) -> Iterable[bytes]:
+    for m in re.finditer(PAT, text):
+        yield m.group(0).encode("utf-8")
 
 
 def find_chunk_boundaries(
@@ -48,18 +56,3 @@ def find_chunk_boundaries(
     # Make sure all boundaries are unique, but might be fewer than desired_num_chunks
     return sorted(set(chunk_boundaries))
 
-
-## Example usage
-with open(
-        os.path.join(os.path.dirname(os.path.realpath(__file__)), '..', 'data/TinyStoriesV2-GPT4-train.txt'),
-        "rb"
-) as f:
-    num_processes = 4
-    boundaries = find_chunk_boundaries(f, num_processes, b"<|endoftext|>")
-
-    # The following is a serial implementation, but you can parallelize this
-    # by sending each start/end pair to a set of processes.
-    for start, end in zip(boundaries[:-1], boundaries[1:]):
-        f.seek(start)
-        chunk = f.read(end - start).decode("utf-8", errors="ignore")
-        # Run pre-tokenization on your chunk and store the counts for each pre-token
