@@ -9,6 +9,9 @@ import torch
 from jaxtyping import Bool, Float, Int
 from torch import Tensor
 
+# my imports
+from cs336_basics.nn_utils import Linear
+from torch import nn
 
 def run_linear(
     d_in: int,
@@ -28,8 +31,9 @@ def run_linear(
     Returns:
         Float[Tensor, "... d_out"]: The transformed output of your linear module.
     """
-
-    raise NotImplementedError
+    layer = Linear(d_in, d_out)
+    layer.weight = nn.Parameter(weights)
+    return layer.forward(in_features)
 
 
 def run_embedding(
