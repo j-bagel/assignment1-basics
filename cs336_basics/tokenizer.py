@@ -26,7 +26,10 @@ class Tokenizer:
         res = []
         # TODO: decode non vocab str
         for pretok in pretok_iter:
-            if pretok in self.token_to_id:
+            id_ = self.token_to_id.get(pretok, None)
+            if id_ is None:
+                pass
+            else:
                 res.append(self.token_to_id[pretok])
         return res
 
