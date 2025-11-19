@@ -9,15 +9,16 @@ class Tokenizer:
                  merges: list[tuple[bytes, bytes]],
                  special_tokens: list[str] | None = None
                  ):
-        self.vocab = vocab
-        self.merges = merges
-        self.special_tokens = special_tokens
         # If any of the special tokens don't exist in the vocab, append them to the vocab.
         if special_tokens:
             for special_token in special_tokens:
                 byte_encoded_special_token = special_token.encode("utf-8")
                 if byte_encoded_special_token not in set(vocab.values()):
                     vocab[len(vocab)] = byte_encoded_special_token
+
+        self.vocab = vocab
+        self.merges = merges
+        self.special_tokens = special_tokens
 
         self.token_to_id = {v: k for k, v in vocab.items()}
         self.merges_ranking = {bytes_tuple: i for i, bytes_tuple in enumerate(merges)}
