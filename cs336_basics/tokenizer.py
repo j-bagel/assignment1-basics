@@ -1,5 +1,6 @@
 import json
 from cs336_basics.pretokenization import pretokenize
+from cs336_basics.tokenizer_utils import merge_pretok
 
 
 class Tokenizer:
@@ -19,6 +20,7 @@ class Tokenizer:
                     vocab[len(vocab)] = byte_encoded_special_token
 
         self.token_to_id = {v: k for k, v in vocab.items()}
+        self.merges_ranking = {bytes_tuple: i for i, bytes_tuple in enumerate(merges)}
 
 
     def encode(self, text: str) -> list[int]:
@@ -28,9 +30,10 @@ class Tokenizer:
         for pretok in pretok_iter:
             id_ = self.token_to_id.get(pretok, None)
             if id_ is None:
-                pass
+                bytes_list = merge_pretok(pretok, self.merges_ranking)
+                res.extend([self.token_to_id.get(b) for b in bytes_list])
             else:
-                res.append(self.token_to_id[pretok])
+                res.append(id_)
         return res
 
 
