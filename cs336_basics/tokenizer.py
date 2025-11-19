@@ -22,7 +22,7 @@ class Tokenizer:
 
 
     def encode(self, text: str) -> list[int]:
-        pretok_iter = pretokenize(text)
+        pretok_iter = pretokenize(text)  # Iterable[bytes]
         res = []
         # TODO: decode non vocab str
         for pretok in pretok_iter:
