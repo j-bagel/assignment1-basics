@@ -413,6 +413,39 @@ def test_encode_iterable_tinystories_matches_tiktoken():
     assert reference_tokenizer.decode(reference_ids) == corpus_contents
 
 
+def test_encode_tinystories_matches_tiktoken():
+    reference_tokenizer = tiktoken.get_encoding("gpt2")
+    tokenizer = get_tokenizer_from_vocab_merges_path(
+        vocab_path=VOCAB_PATH, merges_path=MERGES_PATH, special_tokens=["<|endoftext|>"]
+    )
+    corpus_path = FIXTURES_PATH / "tinystories_sample.txt"
+    with open(corpus_path) as f:
+        corpus_contents = f.read()
+    reference_ids = reference_tokenizer.encode(corpus_contents, allowed_special={"<|endoftext|>"})
+    # all_ids = []
+    all_ids = tokenizer.encode(corpus_contents)
+
+    assert tokenizer.decode(all_ids) == corpus_contents
+    assert reference_tokenizer.decode(reference_ids) == corpus_contents
+
+
+def test_encode_batch_tinystories_matches_tiktoken():
+    reference_tokenizer = tiktoken.get_encoding("gpt2")
+    tokenizer = get_tokenizer_from_vocab_merges_path(
+        vocab_path=VOCAB_PATH, merges_path=MERGES_PATH, special_tokens=["<|endoftext|>"]
+    )
+    corpus_path = FIXTURES_PATH / '../../data' / 'TinyStoriesV2-GPT4-valid.txt'
+    with open(corpus_path) as f:
+        corpus_contents = f.read()
+    reference_ids = reference_tokenizer.encode(corpus_contents, allowed_special={"<|endoftext|>"})
+    # all_ids = []
+    with open(corpus_path, 'rb') as f:
+        all_ids = tokenizer.encode_batch(f)
+
+    assert tokenizer.decode(all_ids) == corpus_contents
+    assert reference_tokenizer.decode(reference_ids) == corpus_contents
+
+
 @pytest.mark.skipif(
     not sys.platform.startswith("linux"),
     reason="rlimit support for non-linux systems is spotty.",

@@ -1,7 +1,9 @@
 import json
 from typing import BinaryIO, Iterable, Iterator
-from cs336_basics.pretokenization import pretokenize
+from cs336_basics.pretokenization import pretokenize, find_chunk_boundaries
 from cs336_basics.tokenizer_utils import merge_pretok
+from multiprocessing import Pool
+from functools import partial
 
 
 class Tokenizer:
@@ -39,6 +41,24 @@ class Tokenizer:
             else:
                 res.append(id_)
         return res
+
+    def encode_batch(self, file: BinaryIO, num_processes: int = 4) -> list[int]:
+        """Encode multiple texts in parallel using multiprocessing, returning a flat list of tokens."""
+        boundaries = find_chunk_boundaries(file, num_processes, b"<|endoftext|>")
+        
+        # Read all chunks
+        chunks = []
+        for start, end in zip(boundaries[:-1], boundaries[1:]):
+            file.seek(start)
+            chunk = file.read(end - start).decode("utf-8", errors="ignore")
+            chunks.append(chunk)
+            
+        # Encode chunks in parallel
+        with Pool(processes=num_processes) as pool:
+            results = pool.map(self.encode, chunks)
+        
+        # Flatten list of lists into single list
+        return [token for result in results for token in result]
 
 
     def decode(self, ids: list[int]) -> str:
