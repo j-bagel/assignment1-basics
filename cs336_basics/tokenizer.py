@@ -25,9 +25,8 @@ class Tokenizer:
 
 
     def encode(self, text: str) -> list[int]:
-        pretok_iter = pretokenize(text)  # Iterable[bytes]
+        pretok_iter = pretokenize(text, self.special_tokens)  # Iterable[bytes]
         res = []
-        # TODO: decode non vocab str
         for pretok in pretok_iter:
             id_ = self.token_to_id.get(pretok, None)
             if id_ is None:
@@ -41,4 +40,4 @@ class Tokenizer:
     def decode(self, ids: list[int]) -> str:
         replacement_bytes = b"\xEF\xBF\xBD"
         bytes_list = [self.vocab.get(i, replacement_bytes) for i in ids]
-        return b"".join(bytes_list).decode("utf-8")
+        return b"".join(bytes_list).decode("utf-8", errors='replace')

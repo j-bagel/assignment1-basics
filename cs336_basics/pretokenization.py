@@ -5,10 +5,34 @@ import regex as re
 PAT = r"""'(?:[sdmt]|ll|ve|re)| ?\p{L}+| ?\p{N}+| ?[^\s\p{L}\p{N}]+|\s+(?!\S)|\s+"""
 
 
-def pretokenize(text: str) -> Iterable[bytes]:
-    for m in re.finditer(PAT, text):
-        yield m.group(0).encode("utf-8")
+def split_with_special_tokens(text: str, special_tokens: list[str]) -> list[str]:
+    # TODO: not really a generator, double memory usage
+    """
+    Example:
+        split_with_special_tokens("Hello<|endoftext|>World", ["<|endoftext|>"])
+        ["Hello", "<|endoftext|>", "World"]
+    """
+    if not special_tokens:
+        return [text] if text else []
 
+    # Escape special tokens and join with | to create pattern
+    # Use capturing group () to keep the special tokens in the result
+    pattern = "(" + "|".join(re.escape(token) for token in special_tokens) + ")"
+
+    # Split but keep the delimiters (special tokens)
+    segments = re.split(pattern, text)
+
+    # Filter out empty strings
+    return [seg for seg in segments if seg]
+
+
+def pretokenize(text: str, special_tokens: list[str]) -> Iterable[bytes]:
+    for s in split_with_special_tokens(text, special_tokens):
+        if special_tokens and s in special_tokens:
+            yield s.encode("utf-8")
+        else:
+            for m in re.finditer(PAT, s):
+                yield m.group(0).encode("utf-8")
 
 def find_chunk_boundaries(
     file: BinaryIO,
@@ -56,3 +80,4 @@ def find_chunk_boundaries(
     # Make sure all boundaries are unique, but might be fewer than desired_num_chunks
     return sorted(set(chunk_boundaries))
 
+# print(list(pretokenize("Hello world<|endoftext|>Beautiful World", ["<|endoftext|>"])))
