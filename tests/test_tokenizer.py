@@ -441,6 +441,7 @@ def test_encode_batch_tinystories_matches_tiktoken():
     # all_ids = []
     with open(corpus_path, 'rb') as f:
         all_ids = tokenizer.encode_batch(f)
+    assert all_ids == reference_ids
 
     assert tokenizer.decode(all_ids) == corpus_contents
     assert reference_tokenizer.decode(reference_ids) == corpus_contents
