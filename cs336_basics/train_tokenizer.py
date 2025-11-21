@@ -1,3 +1,4 @@
+import os
 import json
 from multiprocessing import Pool
 from functools import partial
@@ -51,8 +52,11 @@ def train_bpe(
                 else:
                     bytes_count[b] = 1
 
+    print(len(bytes_count))
+
     return None, None
 
 
 if __name__ == "__main__":
-    train_bpe('/Users/jouyang/Documents/assignment1-basics/data/TinyStoriesV2-GPT4-valid.txt', 1000, ["<|endoftext|>"])
+    txt_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), '..', 'data/TinyStoriesV2-GPT4-valid.txt')
+    train_bpe(txt_path, 1000, ["<|endoftext|>"])
