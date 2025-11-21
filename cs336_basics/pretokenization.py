@@ -34,6 +34,17 @@ def pretokenize(text: str, special_tokens: list[str]) -> Iterable[bytes]:
             for m in re.finditer(PAT, s):
                 yield m.group(0).encode("utf-8")
 
+
+def pretokenize_to_list(text: str, special_tokens: list[str]) -> list[bytes]:
+    res = []
+    for s in split_with_special_tokens(text, special_tokens):
+        if special_tokens and s in special_tokens:
+            res.append(s.encode("utf-8"))
+        else:
+            res.extend([x.encode("utf-8") for x in re.findall(PAT, s)])
+    return res
+
+
 def find_chunk_boundaries(
     file: BinaryIO,
     desired_num_chunks: int,
