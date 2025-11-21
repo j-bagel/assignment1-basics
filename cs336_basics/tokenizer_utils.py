@@ -67,9 +67,9 @@ def merge_pretok(bts: bytes, merges_ranking: dict[tuple[bytes, bytes], int]) -> 
             rank = merges_ranking.get(pair_now, None)
             if rank is not None:
                 heapq.heappush(heap, (rank, pair_now))
-            pairs_pointers[pair_now] = {node}
+            pairs_pointers[pair_now] = [node]
         else:
-            pairs_pointers[pair_now].add(node)
+            pairs_pointers[pair_now].append(node)
         node = node.next
 
     # when heap is not empty, pop the min element, merge the bytes pair and on the fly modify the other components
@@ -79,7 +79,7 @@ def merge_pretok(bts: bytes, merges_ranking: dict[tuple[bytes, bytes], int]) -> 
         while pairs_pointers[pair]:
             # prev - node - next - next2 -> prev - (node + next) - next2
             # delete next
-            node = pairs_pointers[pair].pop()
+            node = pairs_pointers[pair].pop(0)
             prev = node.prev
             next = node.next
             next2 = next.next
@@ -96,9 +96,9 @@ def merge_pretok(bts: bytes, merges_ranking: dict[tuple[bytes, bytes], int]) -> 
                     rank = merges_ranking.get(pair_now, None)
                     if rank is not None:
                         heapq.heappush(heap, (rank, pair_now))
-                    pairs_pointers[pair_now] = {prev}
+                    pairs_pointers[pair_now] = [prev]
                 else:
-                    pairs_pointers[pair_now].add(prev)
+                    pairs_pointers[pair_now].append(prev)
             if next2:
                 pairs_pointers[(next.data, next2.data)].remove(next)
                 # new stuff
@@ -107,9 +107,9 @@ def merge_pretok(bts: bytes, merges_ranking: dict[tuple[bytes, bytes], int]) -> 
                     rank = merges_ranking.get(pair_now, None)
                     if rank is not None:
                         heapq.heappush(heap, (rank, pair_now))
-                    pairs_pointers[pair_now] = {node}
+                    pairs_pointers[pair_now] = [node]
                 else:
-                    pairs_pointers[pair_now].add(node)
+                    pairs_pointers[pair_now].append(node)
 
             # finally change node.data and delete next
             node.data = new_bytes
