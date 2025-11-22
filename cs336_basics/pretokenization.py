@@ -35,14 +35,26 @@ def pretokenize(text: str, special_tokens: list[str]) -> Iterable[bytes]:
                 yield m.group(0).encode("utf-8")
 
 
-def pretokenize_to_list(text: str, special_tokens: list[str]) -> list[bytes]:
-    res = []
+def pretokenize_to_bytes_count(start_end: tuple[int, int], file_path: str, special_tokens: list[str]) -> dict[bytes, int]:
+    special_tokens_bytes = [s.encode('utf-8') for s in special_tokens]
+
+    start, end = start_end
+
+    with open(file_path, 'rb') as file:
+        file.seek(start)
+        text = file.read(end - start).decode("utf-8", errors="ignore")
+
+    bytes_count = {}
     for s in split_with_special_tokens(text, special_tokens):
-        if special_tokens and s in special_tokens:
-            res.append(s.encode("utf-8"))
-        else:
-            res.extend([x.encode("utf-8") for x in re.findall(PAT, s)])
-    return res
+        if s not in special_tokens:
+            res_now = [x.encode("utf-8") for x in re.findall(PAT, s)]
+            for b in res_now:
+                if b in bytes_count:
+                    bytes_count[b] += 1
+                else:
+                    bytes_count[b] = 1
+
+    return bytes_count
 
 
 def find_chunk_boundaries(

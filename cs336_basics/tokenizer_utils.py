@@ -125,6 +125,85 @@ def merge_pretok(bts: bytes, merges_ranking: dict[tuple[bytes, bytes], int]) -> 
     return res
 
 
+def merge_one_pair_bpe(
+        pair: tuple[bytes, bytes],
+        bytes_count: dict[bytes, int],
+        bytes_dll: dict[bytes, DLL],
+        pair_count: dict[tuple[bytes, bytes], int],
+        pair_bytes_pointers: dict[tuple[bytes, bytes], dict[bytes, list[Node]]]
+) -> None:
+    """
+    One step of merging in train_bpe
+
+    Args:
+        pair: the pair being merges
+        bytes_count: the bytes counts after pretok, won't change
+        bytes_dll: the dict of DLL, merge on the fly
+        pair_count: TOTAL count of pairs, change on the fly
+        pair_bytes_pointers: change on the fly
+
+    Returns:
+        None
+    """
+    # new bytes data
+    new_bytes = pair[0] + pair[1]
+
+    for b in pair_bytes_pointers[pair]:  # only those bytes have this pair in it
+        dll = bytes_dll[b]
+        b_weight = bytes_count[b]
+
+        while pair_bytes_pointers[pair][b]:
+            # idea: prev - node - next - next2 -> prev - (node + next) - next2, delete the node 'next'
+
+            # pop from the pointers list and change pair count
+            node = pair_bytes_pointers[pair][b].pop(0)
+            pair_count[pair] -= b_weight
+
+            prev = node.prev
+            next = node.next
+            next2 = next.next
+
+            # affected pairs
+            if prev:
+                # 0. change pointer list and pair count for old
+                pair_bytes_pointers[(prev.data, node.data)][b].remove(prev)
+                pair_count[(prev.data, node.data)] -= b_weight
+                # 1. change pointer list for new
+                pair_now = (prev.data, new_bytes)
+                if pair_now not in pair_bytes_pointers:
+                    pair_bytes_pointers[pair_now] = {}
+                if b not in pair_bytes_pointers[pair_now]:
+                    pair_bytes_pointers[pair_now][b] = [prev]
+                else:
+                    pair_bytes_pointers[pair_now][b].append(prev)
+                # 2. change pair total count for new
+                if pair_now not in pair_count:
+                    pair_count[pair_now] = b_weight
+                else:
+                    pair_count[pair_now] += b_weight
+            if next2:
+                # 0. change pointer list and pair count for old
+                pair_bytes_pointers[(next.data, next2.data)][b].remove(next)
+                pair_count[(next.data, next2.data)] -= b_weight
+                # 1. change pointer list for new
+                pair_now = (new_bytes, next2.data)
+                if pair_now not in pair_bytes_pointers:
+                    pair_bytes_pointers[pair_now] = {}
+                if b not in pair_bytes_pointers[pair_now]:
+                    pair_bytes_pointers[pair_now][b] = [node]
+                else:
+                    pair_bytes_pointers[pair_now][b].append(node)
+                # 2. change pair total count for new
+                if pair_now not in pair_count:
+                    pair_count[pair_now] = b_weight
+                else:
+                    pair_count[pair_now] += b_weight
+
+            # finally change node.data and delete next
+            node.data = new_bytes
+            dll.delete(next)
+
+
 # merges_ranking = {(b'b', b's'): 1, (b'bs', b's'): 2}
 # res = merge_pretok(b'bsss', merges_ranking)
 # print(res)
