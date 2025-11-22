@@ -1,4 +1,5 @@
 import json
+import pickle
 from typing import BinaryIO, Iterable, Iterator
 from cs336_basics.pretokenization import pretokenize, find_chunk_boundaries
 from cs336_basics.tokenizer_utils import merge_pretok
@@ -29,6 +30,20 @@ class Tokenizer:
         self.token_to_id = {v: k for k, v in vocab.items()}
         self.merges_ranking = {bytes_tuple: i for i, bytes_tuple in enumerate(merges)}
 
+    @classmethod
+    def from_files(cls, vocab_path: str, merges_path: str, special_tokens_path: str | None = None):
+        """Load tokenizer from pickle files."""
+        with open(vocab_path, 'rb') as f:
+            vocab = pickle.load(f)
+        with open(merges_path, 'rb') as f:
+            merges = pickle.load(f)
+        
+        special_tokens = None
+        if special_tokens_path:
+            with open(special_tokens_path, 'rb') as f:
+                special_tokens = pickle.load(f)
+        
+        return cls(vocab, merges, special_tokens)
 
     def encode(self, text: str) -> list[int]:
         pretok_iter = pretokenize(text, self.special_tokens)  # Iterable[bytes]

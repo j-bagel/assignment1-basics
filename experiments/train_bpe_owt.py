@@ -11,19 +11,19 @@ TEST_RUN = False
 
 if TEST_RUN:
     txt_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), '..',
-                            'data/TinyStoriesV2-GPT4-train-small.txt')
+                            'data/owt_valid.txt')
 else:
     txt_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), '..',
-                            'data/TinyStoriesV2-GPT4-train.txt')
+                            'data/owt_train.txt')
 
 
 def main():
     start_time = time.time()
     special_tokens = ["<|endoftext|>"]
-    vocab, merges = train_bpe(txt_path, 10000, special_tokens, num_processes=8)
+    vocab, merges = train_bpe(txt_path, 32000, special_tokens, num_processes=2)
 
     # Save vocab, merges, and special_tokens
-    output_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), '..', 'data/tokenizer_tinystories')
+    output_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), '..', 'data/tokenizer_owt')
     os.makedirs(output_dir, exist_ok=True)
     
     with open(os.path.join(output_dir, 'vocab.pkl'), 'wb') as f:

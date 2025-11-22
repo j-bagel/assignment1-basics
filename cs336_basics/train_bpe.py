@@ -1,5 +1,6 @@
 import os
 import json
+from tqdm import tqdm
 from multiprocessing import Pool
 from functools import partial
 from cs336_basics.pretokenization import pretokenize, find_chunk_boundaries, pretokenize_to_bytes_count
@@ -28,6 +29,7 @@ def train_bpe(
     special_tokens_bytes = [s.encode('utf-8') for s in special_tokens]
 
     # --------------------- 1. pretokenize ---------------------
+    print("pretokenizing...")
     with open(input_path, 'rb') as file:
         boundaries = find_chunk_boundaries(file, num_processes, b"<|endoftext|>")
         # Read all chunks
@@ -44,6 +46,7 @@ def train_bpe(
         )
 
     # --------------------- 2. prepare ---------------------
+    print("preparing...")
     # aggregate bytes count dict
     bytes_count = bytes_count_list[0]
     for d in bytes_count_list[1:]:
@@ -79,13 +82,15 @@ def train_bpe(
             node = node.next
 
     # --------------------- 3. merge loop ---------------------
+    print("merging...")
     vocab = {i: bytes([i]) for i in range(256)}
     for b in special_tokens_bytes:
         if b not in set(vocab.values()):
             vocab[len(vocab)] = b
     merges = []
 
-    while len(vocab) < vocab_size:
+    steps = vocab_size - len(vocab)
+    for _ in tqdm(range(steps)):
         # the pair for this merge step
         max_count = max(pair_count.values())
         # When computing merges, deterministically break ties in pair frequency by
