@@ -43,3 +43,25 @@ class Embedding(nn.Module):
     def initialize(self):
         sd = 1
         torch.nn.init.trunc_normal_(self.weight, mean=0, std=sd, a=-3 * sd, b=3 * sd)
+
+class RMSNorm(nn.Module):
+    def __init__(self, d_model: int, eps: float = 1e-5, device=None, dtype=None):
+        super().__init__()
+        self.d_model = d_model
+        self.eps = eps
+        self.gain = nn.Parameter(torch.ones(self.d_model, device=device, dtype=dtype))
+
+    def forward(self, x: Tensor) -> Tensor:
+        in_dtype = x.dtype
+        x = x.to(torch.float32)  # let's say it's of shape (batch_size, sequence_length, d_model)
+
+        # one_over_RMS = 1 / (torch.sqrt(torch.sum(x * x, dim=-1) / self.d_model + self.eps))  # shape (batch_size, sequence_length)
+        # result = x * einsum(one_over_RMS, self.gain, "..., d_out -> ... d_out")
+        result = x * self.gain * torch.rsqrt(torch.mean(x * x, dim=-1, keepdim=True) + self.eps)
+
+        # Return the result in the original dtype
+        return result.to(in_dtype)
+
+
+
+
