@@ -23,7 +23,7 @@ def main():
     vocab, merges = train_bpe(txt_path, 10000, special_tokens, num_processes=8)
 
     # Save vocab, merges, and special_tokens
-    output_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), '..', 'data/tokenizer_tinystories')
+    output_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), '..', 'models/tokenizer_tinystories')
     os.makedirs(output_dir, exist_ok=True)
     
     with open(os.path.join(output_dir, 'vocab.pkl'), 'wb') as f:

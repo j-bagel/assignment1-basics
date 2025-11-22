@@ -81,6 +81,11 @@ class Tokenizer:
         bytes_list = [self.vocab.get(i, replacement_bytes) for i in ids]
         return b"".join(bytes_list).decode("utf-8", errors='replace')
 
+    def decode_to_bytes_list(self, ids: list[int]) -> list[bytes]:
+        replacement_bytes = b"\xEF\xBF\xBD"
+        bytes_list = [self.vocab.get(i, replacement_bytes) for i in ids]
+        return bytes_list
+
     def encode_iterable(self, iterable: Iterable[str]) -> Iterator[int]:
         for text in iterable:
             pretok_iter = pretokenize(text, self.special_tokens)  # Iterable[bytes]
