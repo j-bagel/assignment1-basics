@@ -2,6 +2,7 @@ import torch
 from torch import Tensor, nn
 from einops import rearrange, einsum
 import numpy as np
+import math
 
 
 class Linear(nn.Module):
@@ -61,6 +62,62 @@ class RMSNorm(nn.Module):
 
         # Return the result in the original dtype
         return result.to(in_dtype)
+
+class SwiGLU(nn.Module):
+    def __init__(self, d_model: int, d_ff: int | None, device=None, dtype=None):
+        super().__init__()
+        self.d_model = d_model
+        if d_ff is None:
+            d_ff = math.ceil(d_model / 24) * 64
+        self.d_ff = d_ff
+
+        self.w1_weight = nn.Parameter(
+            torch.empty((self.d_ff, self.d_model), device=device, dtype=dtype)
+        )
+        self.w2_weight = nn.Parameter(
+            torch.empty((self.d_model, self.d_ff), device=device, dtype=dtype)
+        )
+        self.w3_weight = nn.Parameter(
+            torch.empty((self.d_ff, self.d_model), device=device, dtype=dtype)
+        )
+
+        self.initialize()
+
+    def forward(self, x: Tensor) -> Tensor:
+        w1x = einsum(x, self.w1_weight, "... d_model, d_ff d_model -> ... d_ff")
+        # w1x = x @ self.w1_weight.T
+        w3x = einsum(x, self.w3_weight, "... d_model, d_ff d_model -> ... d_ff")
+        # w3x = x @ self.w3_weight.T
+        silu_w1x = w1x * torch.sigmoid(w1x)
+        right = silu_w1x * w3x
+        return einsum(right, self.w2_weight, "... d_ff, d_model d_ff -> ... d_model")
+
+    def initialize(self):
+        sd = (2.0 / (self.d_model + self.d_ff)) ** 0.5
+        torch.nn.init.trunc_normal_(self.w1_weight, mean=0, std=sd, a=-3*sd, b=3*sd)
+        torch.nn.init.trunc_normal_(self.w2_weight, mean=0, std=sd, a=-3 * sd, b=3 * sd)
+        torch.nn.init.trunc_normal_(self.w3_weight, mean=0, std=sd, a=-3 * sd, b=3 * sd)
+
+
+def softmax(x: Tensor, dim: int) -> Tensor:
+    scaled_x = x - torch.amax(x, dim=dim, keepdim=True)
+    exp_x = torch.exp(scaled_x)
+    return exp_x / exp_x.sum(dim=dim, keepdim=True)
+
+
+def scaled_dot_product_attention(
+    Q: Tensor,  # Float[Tensor, " ... queries d_k"]
+    K: Tensor,  # Float[Tensor, " ... keys d_k"]
+    V: Tensor,  # Float[Tensor, " ... keys d_v"]
+    mask: Tensor | None,  # Bool[Tensor, " ... queries keys"] | None = None
+) -> Tensor:  # Float[Tensor, " ... queries d_v"]
+    d_k = Q.shape[-1]
+    pre_sf = einsum(Q, K, " ... queries d_k, ... keys d_k -> ... queries keys") / math.sqrt(d_k)
+    if mask is not None:
+        pre_sf = pre_sf.masked_fill(~mask, float('-inf'))
+    sf = softmax(pre_sf, dim=-1)
+    return einsum(sf, V, " ... queries keys, ... keys d_v -> ... queries d_v")
+
 
 
 

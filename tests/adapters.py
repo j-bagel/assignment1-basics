@@ -10,7 +10,7 @@ from jaxtyping import Bool, Float, Int
 from torch import Tensor
 
 # my imports
-from cs336_basics.nn_utils import Linear, Embedding, RMSNorm
+from cs336_basics.nn_utils import Linear, Embedding, RMSNorm, SwiGLU, softmax, scaled_dot_product_attention
 from torch import nn
 from cs336_basics.tokenizer import Tokenizer
 from cs336_basics.train_bpe import train_bpe
@@ -90,7 +90,16 @@ def run_swiglu(
     # swiglu.w1.weight.data = w1_weight
     # swiglu.w2.weight.data = w2_weight
     # swiglu.w3.weight.data = w3_weight
-    raise NotImplementedError
+
+    layer = SwiGLU(d_model, d_ff)
+    state_dict = {
+        "w1_weight": w1_weight,
+        "w2_weight": w2_weight,
+        "w3_weight": w3_weight,
+    }
+    layer.load_state_dict(state_dict)
+
+    return layer.forward(in_features)
 
 
 def run_scaled_dot_product_attention(
@@ -111,7 +120,7 @@ def run_scaled_dot_product_attention(
     Returns:
         Float[Tensor, " ... queries d_v"]: Output of SDPA
     """
-    raise NotImplementedError
+    return scaled_dot_product_attention(Q, K, V, mask)
 
 
 def run_multihead_self_attention(
@@ -440,7 +449,7 @@ def run_softmax(in_features: Float[Tensor, " ..."], dim: int) -> Float[Tensor, "
         Float[Tensor, "..."]: Tensor of with the same shape as `in_features` with the output of
         softmax normalizing the specified `dim`.
     """
-    raise NotImplementedError
+    return softmax(in_features, dim)
 
 
 def run_cross_entropy(

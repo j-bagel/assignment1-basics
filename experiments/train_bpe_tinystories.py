@@ -25,16 +25,17 @@ def main():
     # Save vocab, merges, and special_tokens
     output_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), '..', 'models/tokenizer_tinystories')
     os.makedirs(output_dir, exist_ok=True)
-    
-    with open(os.path.join(output_dir, 'vocab.pkl'), 'wb') as f:
-        pickle.dump(vocab, f)
-    with open(os.path.join(output_dir, 'merges.pkl'), 'wb') as f:
-        pickle.dump(merges, f)
-    with open(os.path.join(output_dir, 'special_tokens.pkl'), 'wb') as f:
-        pickle.dump(special_tokens, f)
-    
-    print(f"Saved vocab, merges, and special_tokens to {output_dir}")
-    print(f"Run time {time.time() - start_time: .2f} seconds.")
+
+    if not TEST_RUN:
+        with open(os.path.join(output_dir, 'vocab.pkl'), 'wb') as f:
+            pickle.dump(vocab, f)
+        with open(os.path.join(output_dir, 'merges.pkl'), 'wb') as f:
+            pickle.dump(merges, f)
+        with open(os.path.join(output_dir, 'special_tokens.pkl'), 'wb') as f:
+            pickle.dump(special_tokens, f)
+
+        print(f"Saved vocab, merges, and special_tokens to {output_dir}")
+        print(f"Run time {time.time() - start_time: .2f} seconds.")
 
 
 if __name__ == "__main__":
