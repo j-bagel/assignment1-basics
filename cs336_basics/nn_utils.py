@@ -296,9 +296,9 @@ class MultiHeadSelfAttentionRoPE(nn.Module):
 
     def forward(self, x: Tensor) -> Tensor:
         # x: (..., seq_len, d_model)
-        Q = self.q_proj(x)  # (..., h*d_k, seq_len)
-        K = self.k_proj(x)  # (..., h*d_k, seq_len)
-        V = self.v_proj(x)  # (..., h*d_v, seq_len)
+        Q = self.q_proj(x)  # (..., seq_len, h*d_k)
+        K = self.k_proj(x)  # (..., seq_len, h*d_k)
+        V = self.v_proj(x)  # (..., seq_len, h*d_v)
 
         token_positions = torch.arange(0, x.shape[-2])
         Q = self.rope(Q.unflatten(-1, (self.num_heads, self.d_k)).transpose(-3, -2), token_positions)
