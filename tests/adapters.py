@@ -10,7 +10,10 @@ from jaxtyping import Bool, Float, Int
 from torch import Tensor
 
 # my imports
-from cs336_basics.nn_utils import Linear, Embedding, RMSNorm, SwiGLU, softmax, scaled_dot_product_attention
+from cs336_basics.nn_utils import (
+    Linear, Embedding, RMSNorm, SwiGLU, softmax,
+    scaled_dot_product_attention, RotaryPositionalEmbedding
+)
 from torch import nn
 from cs336_basics.tokenizer import Tokenizer
 from cs336_basics.train_bpe import train_bpe
@@ -143,7 +146,6 @@ def run_multihead_self_attention(
     Args:
         d_model (int): Dimensionality of the feedforward input and output.
         num_heads (int): Number of heads to use in multi-headed attention.
-        max_seq_len (int): Maximum sequence length to pre-cache if your implementation does that.
         q_proj_weight (Float[Tensor, "d_k d_in"]): Weights for the Q projection
         k_proj_weight (Float[Tensor, "d_k d_in"]): Weights for the K projection
         v_proj_weight (Float[Tensor, "d_k d_in"]): Weights for the V projection
@@ -216,7 +218,8 @@ def run_rope(
     Returns:
         Float[Tensor, " ... sequence_length d_k"]: Tensor with RoPEd input.
     """
-    raise NotImplementedError
+    rope = RotaryPositionalEmbedding(theta=theta, d_k=d_k, max_seq_len=max_seq_len)
+    return rope.forward(in_query_or_key, token_positions)
 
 
 def run_transformer_block(

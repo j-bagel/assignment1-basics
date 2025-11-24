@@ -17,7 +17,8 @@ class Linear(nn.Module):
         self.initialize()
 
     def forward(self, input: Tensor) -> Tensor:
-        return einsum(input, self.weight, "... d_in, d_out d_in -> ... d_out")
+        # return einsum(input, self.weight, "... d_in, d_out d_in -> ... d_out")
+        return input @ self.weight.T  # faster
 
     def initialize(self):
         sd = (2.0 / (self.in_features + self.out_features)) ** 0.5
@@ -84,13 +85,14 @@ class SwiGLU(nn.Module):
         self.initialize()
 
     def forward(self, x: Tensor) -> Tensor:
-        w1x = einsum(x, self.w1_weight, "... d_model, d_ff d_model -> ... d_ff")
-        # w1x = x @ self.w1_weight.T
-        w3x = einsum(x, self.w3_weight, "... d_model, d_ff d_model -> ... d_ff")
-        # w3x = x @ self.w3_weight.T
+        # w1x = einsum(x, self.w1_weight, "... d_model, d_ff d_model -> ... d_ff")
+        w1x = x @ self.w1_weight.T
+        # w3x = einsum(x, self.w3_weight, "... d_model, d_ff d_model -> ... d_ff")
+        w3x = x @ self.w3_weight.T
         silu_w1x = w1x * torch.sigmoid(w1x)
         right = silu_w1x * w3x
-        return einsum(right, self.w2_weight, "... d_ff, d_model d_ff -> ... d_model")
+        # return einsum(right, self.w2_weight, "... d_ff, d_model d_ff -> ... d_model")
+        return right @ self.w2_weight.T
 
     def initialize(self):
         sd = (2.0 / (self.d_model + self.d_ff)) ** 0.5
@@ -118,6 +120,34 @@ def scaled_dot_product_attention(
     sf = softmax(pre_sf, dim=-1)
     return einsum(sf, V, " ... queries keys, ... keys d_v -> ... queries d_v")
 
+
+class RotaryPositionalEmbedding(nn.Module):
+    def __init__(self, theta: float, d_k: int, max_seq_len: int, device=None):
+        super().__init__()
+
+        assert d_k % 2 == 0, "d_k must be even"
+
+        cos, sin = self.build_rope_cache(theta, max_seq_len, d_k, device)
+
+        # Register as buffers — these are NOT parameters
+        self.register_buffer("cos_cached", cos)  # shape (max_seq_len, d_k//2)
+        self.register_buffer("sin_cached", sin)  # shape (max_seq_len, d_k//2)
+
+    def forward(self, x: Tensor, token_positions: Tensor) -> Tensor:
+        # x: (..., seq_len, d_k)
+        # token_positions: (..., seq_len)
+        cos = self.cos_cached[token_positions]  # (..., seq_len, d_k//2)
+        sin = self.sin_cached[token_positions]  # (..., seq_len, d_k//2)
+        x1 = x[..., 0::2]  # (..., seq_len, d_k//2)
+        x2 = x[..., 1::2]  # (..., seq_len, d_k//2)
+        return torch.stack([cos*x1 - sin*x2, sin*x1 + cos*x2], dim=-1).reshape_as(x)
+
+    @staticmethod
+    def build_rope_cache(theta: float, max_seq_len: int, d: int, device: None):
+        i_tensor = torch.arange(0, max_seq_len, device=device, dtype=torch.float32)
+        k_tensor = torch.arange(0, d, step=2, device=device, dtype=torch.float32)
+        theta_tensor = torch.outer(i_tensor, theta ** (-k_tensor/d))
+        return torch.cos(theta_tensor), torch.sin(theta_tensor)
 
 
 
