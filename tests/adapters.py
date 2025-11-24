@@ -13,7 +13,8 @@ from torch import Tensor
 from cs336_basics.nn_utils import (
     Linear, Embedding, RMSNorm, SwiGLU, softmax,
     scaled_dot_product_attention, RotaryPositionalEmbedding,
-    MultiHeadSelfAttentionEinsum, MultiHeadSelfAttentionRoPEEinsum
+    MultiHeadSelfAttentionEinsum, MultiHeadSelfAttentionRoPEEinsum,
+    MultiHeadSelfAttention, MultiHeadSelfAttentionRoPE
 )
 from torch import nn
 from cs336_basics.tokenizer import Tokenizer
@@ -157,20 +158,28 @@ def run_multihead_self_attention(
         Float[Tensor, " ... sequence_length d_out"]: Tensor with the output of running your optimized, batched multi-headed attention
         implementation with the given QKV projection weights and input features.
     """
-    d_in = q_proj_weight.shape[-1]
-    d_out = o_proj_weight.shape[-2]
+    # # einsum version
+    # d_in = q_proj_weight.shape[-1]
+    # d_out = o_proj_weight.shape[-2]
+    #
+    # q_proj_weight = q_proj_weight.reshape((num_heads, -1, d_in))
+    # k_proj_weight = k_proj_weight.reshape((num_heads, -1, d_in))
+    # v_proj_weight = v_proj_weight.reshape((num_heads, -1, d_in))
+    # o_proj_weight = o_proj_weight.reshape((d_out, num_heads, -1))
+    # o_proj_weight = o_proj_weight.transpose(-3, -2)
+    #
+    # layer = MultiHeadSelfAttentionEinsum(d_model, num_heads)
+    # layer.WQ.weight = nn.Parameter(q_proj_weight)
+    # layer.WK.weight = nn.Parameter(k_proj_weight)
+    # layer.WV.weight = nn.Parameter(v_proj_weight)
+    # layer.WO.weight = nn.Parameter(o_proj_weight)
+    # return layer.forward(in_features)
 
-    q_proj_weight = q_proj_weight.reshape((num_heads, -1, d_in))
-    k_proj_weight = k_proj_weight.reshape((num_heads, -1, d_in))
-    v_proj_weight = v_proj_weight.reshape((num_heads, -1, d_in))
-    o_proj_weight = o_proj_weight.reshape((d_out, num_heads, -1))
-    o_proj_weight = o_proj_weight.transpose(-3, -2)
-
-    layer = MultiHeadSelfAttentionEinsum(d_model, num_heads)
-    layer.WQ.weight = nn.Parameter(q_proj_weight)
-    layer.WK.weight = nn.Parameter(k_proj_weight)
-    layer.WV.weight = nn.Parameter(v_proj_weight)
-    layer.WO.weight = nn.Parameter(o_proj_weight)
+    layer = MultiHeadSelfAttention(d_model, num_heads)
+    layer.q_proj.weight = nn.Parameter(q_proj_weight)
+    layer.k_proj.weight = nn.Parameter(k_proj_weight)
+    layer.v_proj.weight = nn.Parameter(v_proj_weight)
+    layer.o_proj.weight = nn.Parameter(o_proj_weight)
     return layer.forward(in_features)
 
 
@@ -211,25 +220,38 @@ def run_multihead_self_attention_with_rope(
         Float[Tensor, " ... sequence_length d_out"]: Tensor with the output of running your optimized, batched multi-headed attention
         implementation with the given QKV projection weights and input features.
     """
-    d_in = q_proj_weight.shape[-1]
-    d_out = o_proj_weight.shape[-2]
+    # # einsum version
+    # d_in = q_proj_weight.shape[-1]
+    # d_out = o_proj_weight.shape[-2]
+    #
+    # q_proj_weight = q_proj_weight.reshape((num_heads, -1, d_in))
+    # k_proj_weight = k_proj_weight.reshape((num_heads, -1, d_in))
+    # v_proj_weight = v_proj_weight.reshape((num_heads, -1, d_in))
+    # o_proj_weight = o_proj_weight.reshape((d_out, num_heads, -1))
+    # o_proj_weight = o_proj_weight.transpose(-3, -2)
+    #
+    # layer = MultiHeadSelfAttentionRoPEEinsum(
+    #     d_model=d_model,
+    #     num_heads=num_heads,
+    #     max_seq_len=max_seq_len,
+    #     theta=theta
+    # )
+    # layer.WQ.weight = nn.Parameter(q_proj_weight)
+    # layer.WK.weight = nn.Parameter(k_proj_weight)
+    # layer.WV.weight = nn.Parameter(v_proj_weight)
+    # layer.WO.weight = nn.Parameter(o_proj_weight)
+    # return layer.forward(in_features)
 
-    q_proj_weight = q_proj_weight.reshape((num_heads, -1, d_in))
-    k_proj_weight = k_proj_weight.reshape((num_heads, -1, d_in))
-    v_proj_weight = v_proj_weight.reshape((num_heads, -1, d_in))
-    o_proj_weight = o_proj_weight.reshape((d_out, num_heads, -1))
-    o_proj_weight = o_proj_weight.transpose(-3, -2)
-
-    layer = MultiHeadSelfAttentionRoPEEinsum(
+    layer = MultiHeadSelfAttentionRoPE(
         d_model=d_model,
         num_heads=num_heads,
         max_seq_len=max_seq_len,
         theta=theta
     )
-    layer.WQ.weight = nn.Parameter(q_proj_weight)
-    layer.WK.weight = nn.Parameter(k_proj_weight)
-    layer.WV.weight = nn.Parameter(v_proj_weight)
-    layer.WO.weight = nn.Parameter(o_proj_weight)
+    layer.q_proj.weight = nn.Parameter(q_proj_weight)
+    layer.k_proj.weight = nn.Parameter(k_proj_weight)
+    layer.v_proj.weight = nn.Parameter(v_proj_weight)
+    layer.o_proj.weight = nn.Parameter(o_proj_weight)
     return layer.forward(in_features)
 
 
