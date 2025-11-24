@@ -12,7 +12,8 @@ from torch import Tensor
 # my imports
 from cs336_basics.nn_utils import (
     Linear, Embedding, RMSNorm, SwiGLU, softmax,
-    scaled_dot_product_attention, RotaryPositionalEmbedding
+    scaled_dot_product_attention, RotaryPositionalEmbedding,
+    MultiHeadSelfAttentionEinsum, MultiHeadSelfAttentionRoPEEinsum
 )
 from torch import nn
 from cs336_basics.tokenizer import Tokenizer
@@ -132,7 +133,7 @@ def run_multihead_self_attention(
     q_proj_weight: Float[Tensor, " d_k d_in"],
     k_proj_weight: Float[Tensor, " d_k d_in"],
     v_proj_weight: Float[Tensor, " d_v d_in"],
-    o_proj_weight: Float[Tensor, " d_model d_v"],
+    o_proj_weight: Float[Tensor, " d_out d_v"],
     in_features: Float[Tensor, " ... sequence_length d_in"],
 ) -> Float[Tensor, " ... sequence_length d_out"]:
     """
@@ -148,7 +149,7 @@ def run_multihead_self_attention(
         num_heads (int): Number of heads to use in multi-headed attention.
         q_proj_weight (Float[Tensor, "d_k d_in"]): Weights for the Q projection
         k_proj_weight (Float[Tensor, "d_k d_in"]): Weights for the K projection
-        v_proj_weight (Float[Tensor, "d_k d_in"]): Weights for the V projection
+        v_proj_weight (Float[Tensor, "d_v d_in"]): Weights for the V projection
         o_proj_weight (Float[Tensor, "d_model d_v"]): Weights for the output projection
         in_features (Float[Tensor, "... sequence_length d_in"]): Tensor to run your implementation on.
 
@@ -156,7 +157,21 @@ def run_multihead_self_attention(
         Float[Tensor, " ... sequence_length d_out"]: Tensor with the output of running your optimized, batched multi-headed attention
         implementation with the given QKV projection weights and input features.
     """
-    raise NotImplementedError
+    d_in = q_proj_weight.shape[-1]
+    d_out = o_proj_weight.shape[-2]
+
+    q_proj_weight = q_proj_weight.reshape((num_heads, -1, d_in))
+    k_proj_weight = k_proj_weight.reshape((num_heads, -1, d_in))
+    v_proj_weight = v_proj_weight.reshape((num_heads, -1, d_in))
+    o_proj_weight = o_proj_weight.reshape((d_out, num_heads, -1))
+    o_proj_weight = o_proj_weight.transpose(-3, -2)
+
+    layer = MultiHeadSelfAttentionEinsum(d_model, num_heads)
+    layer.WQ.weight = nn.Parameter(q_proj_weight)
+    layer.WK.weight = nn.Parameter(k_proj_weight)
+    layer.WV.weight = nn.Parameter(v_proj_weight)
+    layer.WO.weight = nn.Parameter(o_proj_weight)
+    return layer.forward(in_features)
 
 
 def run_multihead_self_attention_with_rope(
@@ -196,7 +211,26 @@ def run_multihead_self_attention_with_rope(
         Float[Tensor, " ... sequence_length d_out"]: Tensor with the output of running your optimized, batched multi-headed attention
         implementation with the given QKV projection weights and input features.
     """
-    raise NotImplementedError
+    d_in = q_proj_weight.shape[-1]
+    d_out = o_proj_weight.shape[-2]
+
+    q_proj_weight = q_proj_weight.reshape((num_heads, -1, d_in))
+    k_proj_weight = k_proj_weight.reshape((num_heads, -1, d_in))
+    v_proj_weight = v_proj_weight.reshape((num_heads, -1, d_in))
+    o_proj_weight = o_proj_weight.reshape((d_out, num_heads, -1))
+    o_proj_weight = o_proj_weight.transpose(-3, -2)
+
+    layer = MultiHeadSelfAttentionRoPEEinsum(
+        d_model=d_model,
+        num_heads=num_heads,
+        max_seq_len=max_seq_len,
+        theta=theta
+    )
+    layer.WQ.weight = nn.Parameter(q_proj_weight)
+    layer.WK.weight = nn.Parameter(k_proj_weight)
+    layer.WV.weight = nn.Parameter(v_proj_weight)
+    layer.WO.weight = nn.Parameter(o_proj_weight)
+    return layer.forward(in_features)
 
 
 def run_rope(

@@ -25,6 +25,46 @@ class Linear(nn.Module):
         torch.nn.init.trunc_normal_(self.weight, mean=0, std=sd, a=-3*sd, b=3*sd)
 
 
+class LinearQKV(nn.Module):
+    def __init__(self, num_heads: int, d_proj: int, d_model: int, device=None, dtype=None):
+        super().__init__()
+
+        self.num_heads = num_heads
+        self.d_proj= d_proj
+        self.d_model = d_model
+        self.weight = nn.Parameter(
+            torch.empty((self.num_heads, self.d_proj, self.d_model), device=device, dtype=dtype)
+        )
+        self.initialize()
+
+    def forward(self, input: Tensor) -> Tensor:
+        return einsum(input, self.weight, "... seq_len d_in, h d_out d_in -> ... h seq_len d_out")
+
+    def initialize(self):
+        sd = (2.0 / (self.num_heads * self.d_proj + self.d_model)) ** 0.5
+        torch.nn.init.trunc_normal_(self.weight, mean=0, std=sd, a=-3*sd, b=3*sd)
+
+
+class LinearO(nn.Module):
+    def __init__(self, num_heads: int, d_proj: int, d_model: int, device=None, dtype=None):
+        super().__init__()
+
+        self.num_heads = num_heads
+        self.d_proj = d_proj
+        self.d_model = d_model
+        self.weight = nn.Parameter(
+            torch.empty((self.num_heads, self.d_model, self.d_proj), device=device, dtype=dtype)
+        )
+        self.initialize()
+
+    def forward(self, input: Tensor) -> Tensor:
+        return einsum(input, self.weight, "... h seq_len d_in, h d_out d_in -> ... seq_len d_out")
+
+    def initialize(self):
+        sd = (2.0 / (self.num_heads * self.d_proj + self.d_model)) ** 0.5
+        torch.nn.init.trunc_normal_(self.weight, mean=0, std=sd, a=-3 * sd, b=3 * sd)
+
+
 class Embedding(nn.Module):
     def __init__(self, num_embeddings: int, embedding_dim: int, device=None, dtype=None):
         super().__init__()
@@ -92,7 +132,7 @@ class SwiGLU(nn.Module):
         silu_w1x = w1x * torch.sigmoid(w1x)
         right = silu_w1x * w3x
         # return einsum(right, self.w2_weight, "... d_ff, d_model d_ff -> ... d_model")
-        return right @ self.w2_weight.T
+        return right @ self.w2_weight.T  # faster
 
     def initialize(self):
         sd = (2.0 / (self.d_model + self.d_ff)) ** 0.5
@@ -150,5 +190,58 @@ class RotaryPositionalEmbedding(nn.Module):
         return torch.cos(theta_tensor), torch.sin(theta_tensor)
 
 
+class MultiHeadSelfAttentionEinsum(nn.Module):
+    def __init__(self, d_model: int, num_heads: int, device=None, dtype=None):
+        super().__init__()
+        self.num_heads = num_heads
+        self.d_k = d_model // num_heads
+        self.d_v = d_model // num_heads
+        self.d_model = d_model
+
+        self.device = device
+
+        self.WQ = LinearQKV(self.num_heads, self.d_k, self.d_model, device=device, dtype=dtype)
+        self.WK = LinearQKV(self.num_heads, self.d_k, self.d_model, device=device, dtype=dtype)
+        self.WV = LinearQKV(self.num_heads, self.d_v, self.d_model, device=device, dtype=dtype)
+        self.WO = LinearO(self.num_heads, self.d_v, self.d_model, device=device, dtype=dtype)
+
+    def forward(self, x: Tensor) -> Tensor:
+        # x: (..., seq_len, d_model)
+        Q = self.WQ(x)  # (..., h, seq, d_k)
+        K = self.WK(x)  # (..., h, seq, d_k)
+        V = self.WV(x)  # (..., h, seq, d_v)
+        seq_len = x.shape[-2]
+        mask = torch.tril(torch.ones(seq_len, seq_len, device=self.device)).bool()
+        attn = scaled_dot_product_attention(Q, K, V, mask)  # (..., h, seq_len, d_v)
+        return self.WO(attn)  # (..., h, seq_len, d_v)
+
+
+class MultiHeadSelfAttentionRoPEEinsum(nn.Module):
+    def __init__(self, d_model: int, num_heads: int, max_seq_len: int, theta: float, device=None, dtype=None):
+        super().__init__()
+        self.num_heads = num_heads
+        self.d_k = d_model // num_heads
+        self.d_v = d_model // num_heads
+        self.d_model = d_model
+
+        self.device = device
+
+        self.WQ = LinearQKV(self.num_heads, self.d_k, self.d_model, device=device, dtype=dtype)
+        self.WK = LinearQKV(self.num_heads, self.d_k, self.d_model, device=device, dtype=dtype)
+        self.WV = LinearQKV(self.num_heads, self.d_v, self.d_model, device=device, dtype=dtype)
+        self.WO = LinearO(self.num_heads, self.d_v, self.d_model, device=device, dtype=dtype)
+
+        self.rope = RotaryPositionalEmbedding(theta=theta, d_k=self.d_k, max_seq_len=max_seq_len, device=device)
+
+    def forward(self, x: Tensor) -> Tensor:
+        # x: (..., seq_len, d_model)
+        token_positions = torch.arange(0, x.shape[-2])
+        Q = self.rope(self.WQ(x), token_positions)  # (..., h, seq, d_k)
+        K = self.rope(self.WK(x), token_positions)  # (..., h, seq, d_k)
+        V = self.WV(x)  # (..., h, seq, d_v)
+        seq_len = x.shape[-2]
+        mask = torch.tril(torch.ones(seq_len, seq_len, device=self.device)).bool()
+        attn = scaled_dot_product_attention(Q, K, V, mask)  # (..., h, seq_len, d_v)
+        return self.WO(attn)  # (..., h, seq_len, d_v)
 
 
