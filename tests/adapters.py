@@ -11,10 +11,13 @@ from torch import Tensor
 
 # my imports
 from cs336_basics.nn_utils import (
-    Linear, Embedding, RMSNorm, SwiGLU, softmax,
+    Linear, Embedding, RMSNorm, SwiGLU, softmax, silu,
     scaled_dot_product_attention, RotaryPositionalEmbedding,
     MultiHeadSelfAttentionEinsum, MultiHeadSelfAttentionRoPEEinsum,
     MultiHeadSelfAttention, MultiHeadSelfAttentionRoPE
+)
+from cs336_basics.models import (
+    TransformerBlock, TransformerLM
 )
 from torch import nn
 from cs336_basics.tokenizer import Tokenizer
@@ -98,9 +101,9 @@ def run_swiglu(
 
     layer = SwiGLU(d_model, d_ff)
     state_dict = {
-        "w1_weight": w1_weight,
-        "w2_weight": w2_weight,
-        "w3_weight": w3_weight,
+        "w1.weight": w1_weight,
+        "w2.weight": w2_weight,
+        "w3.weight": w3_weight,
     }
     layer.load_state_dict(state_dict)
 
@@ -348,7 +351,16 @@ def run_transformer_block(
         Float[Tensor, "batch sequence_length d_model"] Tensor with the output of
         running the Transformer block on the input features while using RoPE.
     """
-    raise NotImplementedError
+    block = TransformerBlock(
+        d_model=d_model,
+        num_heads=num_heads,
+        d_ff=d_ff,
+        max_seq_len=max_seq_len,
+        theta=theta
+    )
+    weights["attn.o_proj.weight"] = weights.pop("attn.output_proj.weight")
+    block.load_state_dict(weights, strict=True)
+    return block(in_features)
 
 
 def run_transformer_lm(
@@ -430,7 +442,24 @@ def run_transformer_lm(
         Float[Tensor, "batch_size sequence_length vocab_size"]: Tensor with the predicted unnormalized
         next-word distribution for each token.
     """
-    raise NotImplementedError
+    max_seq_len = context_length
+    weights = {
+        (k.replace("attn.output_proj.weight", "attn.o_proj.weight")
+         if "attn.output_proj.weight" in k else k): v
+        for k, v in weights.items()
+    }
+
+    lm = TransformerLM(
+        vocab_size=vocab_size,
+        num_layers=num_layers,
+        d_model=d_model,
+        num_heads=num_heads,
+        d_ff=d_ff,
+        max_seq_len=max_seq_len,
+        theta=rope_theta
+    )
+    lm.load_state_dict(weights, strict=True)
+    return lm(in_indices)
 
 
 def run_rmsnorm(
@@ -454,7 +483,7 @@ def run_rmsnorm(
         RMSNorm of the `in_features`.
     """
     layer = RMSNorm(d_model, eps)
-    layer.gain = torch.nn.Parameter(weights)
+    layer.weight = torch.nn.Parameter(weights)
     return layer(in_features)
 
 
@@ -469,7 +498,7 @@ def run_silu(in_features: Float[Tensor, " ..."]) -> Float[Tensor, " ..."]:
         Float[Tensor,"..."]: of with the same shape as `in_features` with the output of applying
         SiLU to each element.
     """
-    raise NotImplementedError
+    return silu(in_features)
 
 
 def run_get_batch(

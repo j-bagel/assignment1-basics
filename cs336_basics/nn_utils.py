@@ -1,7 +1,6 @@
 import torch
 from torch import Tensor, nn
 from einops import rearrange, einsum
-import numpy as np
 import math
 
 
@@ -91,7 +90,7 @@ class RMSNorm(nn.Module):
         super().__init__()
         self.d_model = d_model
         self.eps = eps
-        self.gain = nn.Parameter(torch.ones(self.d_model, device=device, dtype=dtype))
+        self.weight = nn.Parameter(torch.ones(self.d_model, device=device, dtype=dtype))  # "gain"
 
     def forward(self, x: Tensor) -> Tensor:
         in_dtype = x.dtype
@@ -99,10 +98,15 @@ class RMSNorm(nn.Module):
 
         # one_over_RMS = 1 / (torch.sqrt(torch.sum(x * x, dim=-1) / self.d_model + self.eps))  # shape (batch_size, sequence_length)
         # result = x * einsum(one_over_RMS, self.gain, "..., d_out -> ... d_out")
-        result = x * self.gain * torch.rsqrt(torch.mean(x * x, dim=-1, keepdim=True) + self.eps)
+        result = x * self.weight * torch.rsqrt(torch.mean(x * x, dim=-1, keepdim=True) + self.eps)
 
         # Return the result in the original dtype
         return result.to(in_dtype)
+
+
+def silu(x: Tensor) -> Tensor:
+    return x * torch.sigmoid(x)
+
 
 class SwiGLU(nn.Module):
     def __init__(self, d_model: int, d_ff: int | None, device=None, dtype=None):
@@ -112,33 +116,19 @@ class SwiGLU(nn.Module):
             d_ff = math.ceil(d_model / 24) * 64
         self.d_ff = d_ff
 
-        self.w1_weight = nn.Parameter(
-            torch.empty((self.d_ff, self.d_model), device=device, dtype=dtype)
-        )
-        self.w2_weight = nn.Parameter(
-            torch.empty((self.d_model, self.d_ff), device=device, dtype=dtype)
-        )
-        self.w3_weight = nn.Parameter(
-            torch.empty((self.d_ff, self.d_model), device=device, dtype=dtype)
-        )
-
-        self.initialize()
+        self.w1 = Linear(in_features=self.d_model, out_features=self.d_ff, device=device, dtype=dtype)
+        self.w2 = Linear(in_features=self.d_ff, out_features=self.d_model, device=device, dtype=dtype)
+        self.w3 = Linear(in_features=self.d_model, out_features=self.d_ff, device=device, dtype=dtype)
 
     def forward(self, x: Tensor) -> Tensor:
         # w1x = einsum(x, self.w1_weight, "... d_model, d_ff d_model -> ... d_ff")
-        w1x = x @ self.w1_weight.T
+        w1x = self.w1(x)
         # w3x = einsum(x, self.w3_weight, "... d_model, d_ff d_model -> ... d_ff")
-        w3x = x @ self.w3_weight.T
-        silu_w1x = w1x * torch.sigmoid(w1x)
+        w3x = self.w3(x)
+        silu_w1x = silu(w1x)
         right = silu_w1x * w3x
         # return einsum(right, self.w2_weight, "... d_ff, d_model d_ff -> ... d_model")
-        return right @ self.w2_weight.T  # faster
-
-    def initialize(self):
-        sd = (2.0 / (self.d_model + self.d_ff)) ** 0.5
-        torch.nn.init.trunc_normal_(self.w1_weight, mean=0, std=sd, a=-3*sd, b=3*sd)
-        torch.nn.init.trunc_normal_(self.w2_weight, mean=0, std=sd, a=-3 * sd, b=3 * sd)
-        torch.nn.init.trunc_normal_(self.w3_weight, mean=0, std=sd, a=-3 * sd, b=3 * sd)
+        return self.w2(right)  # faster
 
 
 def softmax(x: Tensor, dim: int) -> Tensor:
@@ -170,8 +160,8 @@ class RotaryPositionalEmbedding(nn.Module):
         cos, sin = self.build_rope_cache(theta, max_seq_len, d_k, device)
 
         # Register as buffers — these are NOT parameters
-        self.register_buffer("cos_cached", cos)  # shape (max_seq_len, d_k//2)
-        self.register_buffer("sin_cached", sin)  # shape (max_seq_len, d_k//2)
+        self.register_buffer("cos_cached", cos, persistent=False)  # shape (max_seq_len, d_k//2)
+        self.register_buffer("sin_cached", sin, persistent=False)  # shape (max_seq_len, d_k//2)
 
     def forward(self, x: Tensor, token_positions: Tensor) -> Tensor:
         # x: (..., seq_len, d_k)
