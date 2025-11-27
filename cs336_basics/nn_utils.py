@@ -138,11 +138,10 @@ def softmax(x: Tensor, dim: int) -> Tensor:
 
 
 def cross_entropy(inputs: Tensor, targets: Tensor) -> Tensor:
-    scaled_inputs = inputs - torch.amax(inputs, dim=-1, keepdim=True)
-    exp_inputs = torch.exp(scaled_inputs)  # " batch_size vocab_size"
+    scaled_inputs = inputs - torch.amax(inputs, dim=-1, keepdim=True)  # " batch_size vocab_size"
     per_token_loss = (
         - scaled_inputs.gather(-1, targets.unsqueeze(-1)).squeeze(-1)
-        + torch.log(exp_inputs.sum(dim=-1, keepdim=False))
+        + scaled_inputs.logsumexp(dim=-1, keepdim=False)
     )  # " batch_size"
     return per_token_loss.mean()
 
