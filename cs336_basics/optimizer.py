@@ -26,3 +26,38 @@ class SGD(torch.optim.Optimizer):
                 state["t"] = t + 1 # Increment iteration number.
 
         return loss
+
+
+class AdamW(torch.optim.Optimizer):
+    def __init__(self, params, lr=1e-3, betas=(0.9, 0.999), weight_decay=1e-2, eps=1e-8):
+        defaults = {"lr": lr, "betas": betas, "weight_decay": weight_decay, "eps": eps}
+        # lr is 'alpha', weight_decay is 'lambda'
+        super().__init__(params, defaults)
+
+    def step(self, closure: Optional[Callable] = None):
+        loss = None if closure is None else closure()
+        for group in self.param_groups:
+            lr = group["lr"]
+            betas = group["betas"]
+            weight_decay = group["weight_decay"]
+            eps = group["eps"]
+
+            for p in group["params"]:
+                if p.grad is None:
+                    continue
+                state = self.state[p]  # Get state associated with p.
+                t = state.get("t", 1)  # Get iteration number from the state, or initial value.
+                m = state.get("m", torch.zeros_like(p.data))  # first moment
+                v = state.get("v", torch.zeros_like(p.data))  # second moment
+
+                # updates:
+                grad = p.grad.data  # Get the gradient of loss with respect to p.
+                state["m"] = betas[0] * m + (1.0 - betas[0]) * grad
+                state["v"] = betas[1] * v + (1.0 - betas[1]) * (grad ** 2)
+                alpha_t = lr * math.sqrt(1 - betas[1] ** t) / (1 - betas[0] ** t)  # adjusted alpha
+
+                p.data -= alpha_t / (torch.sqrt(state["v"]) + eps) * state["m"]  # Update weight tensor in-place.
+                p.data -= lr * weight_decay * p.data
+                state["t"] = t + 1 # Increment iteration number.
+
+        return loss
