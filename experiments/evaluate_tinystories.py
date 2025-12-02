@@ -21,7 +21,7 @@ def main():
     eval_dataset = np.load(eval_path, mmap_mode='r')
 
     # model dir
-    output_folder = os.path.join(os.path.dirname(os.path.realpath(__file__)), '..', 'models/outputs', 'eager-resonance-13')
+    output_folder = os.path.join(os.path.dirname(os.path.realpath(__file__)), '..', 'sample_model')
 
     # Load model
     print("Loading model...")
