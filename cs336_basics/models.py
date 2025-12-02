@@ -56,7 +56,7 @@ class TransformerLM(nn.Module):
                     theta=theta,
                     device=device,
                     dtype=dtype
-                ) for i in range(num_layers)
+                ) for _ in range(num_layers)
             ]
         )
         self.ln_final = RMSNorm(d_model=d_model, device=device, dtype=dtype)

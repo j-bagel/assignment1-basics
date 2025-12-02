@@ -1,3 +1,4 @@
+from typing import Iterable
 import torch
 from torch import Tensor, nn
 from einops import rearrange, einsum
@@ -132,12 +133,15 @@ class SwiGLU(nn.Module):
 
 
 def softmax(x: Tensor, dim: int) -> Tensor:
+    # softmax of x, on dim
     scaled_x = x - torch.amax(x, dim=dim, keepdim=True)
     exp_x = torch.exp(scaled_x)
     return exp_x / exp_x.sum(dim=dim, keepdim=True)
 
 
 def cross_entropy(inputs: Tensor, targets: Tensor) -> Tensor:
+    # inputs: Float[Tensor, " batch_size vocab_size"], targets: Int[Tensor, " batch_size"]
+    # return: Float[Tensor, ""]
     scaled_inputs = inputs - torch.amax(inputs, dim=-1, keepdim=True)  # " batch_size vocab_size"
     per_token_loss = (
         - scaled_inputs.gather(-1, targets.unsqueeze(-1)).squeeze(-1)
@@ -309,3 +313,19 @@ class MultiHeadSelfAttentionRoPE(nn.Module):
         attn = scaled_dot_product_attention(Q, K, V, mask)  # (..., h, seq_len, d_v)
         attn = attn.transpose(-3, -2).flatten(start_dim=-2, end_dim=-1)
         return self.o_proj(attn)  # (..., seq_len, d_model)
+
+
+def gradient_clipping(parameters: Iterable[torch.nn.Parameter], max_l2_norm: float, eps=1e-6) -> None:
+    total_norm = torch.sqrt(
+        torch.sum(
+            torch.stack([p.grad**2 for p in parameters if p.grad is not None])
+        )
+    )
+
+    clip_coef = max_l2_norm / (total_norm + eps)
+    clip_coef = torch.clamp(clip_coef, max=1.0)
+
+    for p in parameters:
+        if p.grad is not None:
+            p.grad.data.mul_(clip_coef)
+

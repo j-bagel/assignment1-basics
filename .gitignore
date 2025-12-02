@@ -167,3 +167,7 @@ data/*
 
 # mac
 .DS_Store
+
+# Model outputs and wandb logs
+models/outputs/
+**/*wandb*/
