@@ -329,3 +329,52 @@ def gradient_clipping(parameters: Iterable[torch.nn.Parameter], max_l2_norm: flo
         if p.grad is not None:
             p.grad.data.mul_(clip_coef)
 
+
+def top_p_sample(
+    logits: torch.Tensor,
+    top_p: float = 0.95,
+    temperature: float = 1.0,
+    temperature_lower_bound: float = 0.001
+):
+    """
+    logits: (batch_size, vocab_size)
+    returns: (batch_size,)
+    """
+    if temperature < 0:
+        raise ValueError("temperature should be >=0")
+    if top_p <= 0 or top_p > 1:
+        raise ValueError("top_p should be in (0,1]")
+
+    if temperature < temperature_lower_bound:
+        return torch.argmax(logits, dim=-1)
+
+    # 1) Temperature scaling
+    if temperature != 1.0:
+        logits = logits / temperature
+
+    # 2) Convert to probabilities
+    probs = softmax(logits, dim=-1)
+
+    # 3) Sort probabilities (descending)
+    sorted_probs, sorted_indices = torch.sort(probs, dim=-1, descending=True)
+
+    # 4) Cumulative probability
+    cum_probs = torch.cumsum(sorted_probs, dim=-1)
+
+    # 5) Mask tokens with cumulative prob > top_p
+    # Keep at least 1 token per row
+    cutoff = cum_probs > top_p
+    cutoff[:, 0] = False  # ensure at least one token survives
+
+    sorted_probs = sorted_probs.masked_fill(cutoff, 0.0)
+
+    # 6) Renormalize
+    sorted_probs = sorted_probs / sorted_probs.sum(dim=-1, keepdim=True)
+
+    # 7) Sample
+    sampled_idx = torch.multinomial(sorted_probs, num_samples=1).squeeze(-1)
+
+    # 8) Map back to original token ids
+    next_token = sorted_indices.gather(-1, sampled_idx.unsqueeze(-1)).squeeze(-1)
+
+    return next_token

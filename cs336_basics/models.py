@@ -1,6 +1,6 @@
 import torch
 from torch import Tensor, nn
-from cs336_basics.nn_utils import RMSNorm, MultiHeadSelfAttentionRoPE, SwiGLU, Embedding, Linear, softmax
+from cs336_basics.nn_utils import RMSNorm, MultiHeadSelfAttentionRoPE, SwiGLU, Embedding, Linear, softmax, top_p_sample
 
 
 class TransformerBlock(nn.Module):
@@ -67,4 +67,45 @@ class TransformerLM(nn.Module):
         for layer in self.layers:
             x = layer(x)
         return self.lm_head(self.ln_final(x))
+
+    @torch.no_grad()
+    def generate(
+        self,
+        input_ids: Tensor,
+        max_tokens: int,
+        top_p: float = 0.95,
+        temperature: float = 1.0
+    ) -> Tensor:
+        """
+        Autoregressive generation with top-p sampling.
+        
+        Args:
+            input_ids: (batch_size, seq_len) tensor of input token indices
+            max_tokens: maximum total sequence length (including input)
+            top_p: nucleus sampling probability threshold
+            temperature: sampling temperature
+            
+        Returns:
+            (batch_size, output_len) tensor where output_len <= max_tokens
+        """
+        batch_size, seq_len = input_ids.shape
+        
+        if seq_len >= max_tokens:
+            raise ValueError(f"Input length ({seq_len}) must be smaller than max_tokens ({max_tokens})")
+        
+        # Start with input
+        generated = input_ids
+        
+        for _ in range(max_tokens - seq_len):
+            # Get logits for the last position
+            logits = self.forward(generated)  # (batch_size, current_len, vocab_size)
+            next_token_logits = logits[:, -1, :]  # (batch_size, vocab_size)
+            
+            # Sample next token
+            next_token = top_p_sample(next_token_logits, top_p=top_p, temperature=temperature)  # (batch_size,)
+            
+            # Append to sequence
+            generated = torch.cat([generated, next_token.unsqueeze(-1)], dim=-1)
+        
+        return generated
 
