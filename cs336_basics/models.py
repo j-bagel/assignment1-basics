@@ -109,3 +109,11 @@ class TransformerLM(nn.Module):
         
         return generated
 
+
+class TransformerLMWithTiedWeights(TransformerLM):
+    """TransformerLM with weight tying between token embeddings and LM head."""
+    
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.lm_head.weight = self.token_embeddings.weight
+

@@ -5,6 +5,7 @@ import torch
 from torch import nn
 from typing import Type
 import os
+from tqdm import tqdm
 
 
 class MyTrainer:
@@ -49,7 +50,8 @@ class MyTrainer:
     def train(self):
         self.model.train()
 
-        for step in range(self.max_steps):
+        pbar = tqdm(range(self.max_steps), desc="Training", unit="step")
+        for step in pbar:
             data, target = get_batch(
                 dataset=self.train_dataset,
                 batch_size=self.batch_size,
@@ -74,6 +76,9 @@ class MyTrainer:
             loss.backward()
             self.optimizer.step()
 
+            # Update tqdm progress bar
+            pbar.set_postfix(loss=f"{loss.item():.4f}", lr=f"{lr:.2e}" if lr else "N/A")
+
             if step % self.log_steps == 0:
                 if self.db is not None:
                     self.db.log({
@@ -81,9 +86,6 @@ class MyTrainer:
                         "global_step": step,
                         "learning_rate": lr
                     })
-            
-            if step % 10 == 0:
-                print(f"Step {step}, Loss: {loss.item():.4f}")
 
             if step > 0 and step % self.save_steps == 0:
                 checkpoint_path = os.path.join(self.checkpoints_folder, f"checkpoint_step_{step}.pt")
