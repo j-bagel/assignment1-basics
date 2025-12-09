@@ -86,6 +86,11 @@ class Embedding(nn.Module):
         sd = 1
         torch.nn.init.trunc_normal_(self.weight, mean=0, std=sd, a=-3 * sd, b=3 * sd)
 
+    def conservative_initialize(self):
+        sd = math.sqrt(0.5)
+        torch.nn.init.trunc_normal_(self.weight, mean=0, std=sd, a=-3 * sd, b=3 * sd)
+
+
 class RMSNorm(nn.Module):
     def __init__(self, d_model: int, eps: float = 1e-5, device=None, dtype=None):
         super().__init__()

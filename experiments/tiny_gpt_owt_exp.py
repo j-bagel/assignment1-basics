@@ -7,7 +7,7 @@ import time
 
 from cs336_basics.nn_utils import cross_entropy
 from cs336_basics.trainer import MyTrainer
-from cs336_basics.models import TransformerLM
+from cs336_basics.models import TransformerLM, TransformerLMWithTiedWeights
 from cs336_basics.optimizer import AdamW
 
 import wandb
@@ -17,7 +17,7 @@ def main():
     start_time = time.time()
     parser = argparse.ArgumentParser()
     parser.add_argument('--batch_size', type=int, default=32)
-    parser.add_argument('--max_lr', type=float, default=4e-3)
+    parser.add_argument('--max_lr', type=float, default=2e-3)
     parser.add_argument('--min_lr', type=float, default=2e-5)
     parser.add_argument('--beta_1', type=float, default=0.9)
     parser.add_argument('--beta_2', type=float, default=0.95)
@@ -59,7 +59,7 @@ def main():
     wandb.init(
         project="Tiny GPT with OWT on MPS",
         config=vars(args),
-        name=f"lr_{lr_name}__warmup_{warmup_name}"
+        name=f"lr_{lr_name}__warmup_{warmup_name}__not_tied"
     )
 
     # output folder for MyTrainer
@@ -92,7 +92,7 @@ def main():
         train_dataset=train_dataset,
         max_steps=max_steps,
         log_steps=1,
-        save_steps=1000,
+        save_steps=2000,
         batch_size=args.batch_size,
         context_length=max_seq_len,
         output_folder=output_folder,
@@ -113,7 +113,6 @@ def main():
 
     print(f"Training finished in {(time.time() - start_time) / 60:.2f} minutes.")
 
+
 if __name__ == "__main__":
     main()
-
-# restful-galaxy-12 Mean Loss: 1.8179 ± 0.0044

@@ -115,5 +115,6 @@ class TransformerLMWithTiedWeights(TransformerLM):
     
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
+        self.token_embeddings.conservative_initialize()  # shrink the tied weights
         self.lm_head.weight = self.token_embeddings.weight
 
