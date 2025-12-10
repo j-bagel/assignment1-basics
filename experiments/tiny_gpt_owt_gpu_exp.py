@@ -26,7 +26,7 @@ def main():
     parser.add_argument('--beta_2', type=float, default=0.95)
     parser.add_argument('--warmup_steps', type=int, default=200)
     parser.add_argument('--weight_decay', type=float, default=0.01)
-    parser.add_argument('--total_tokens', type=int, default=int(3e8))
+    parser.add_argument('--total_tokens', type=int, default=int(1.6e9))
     args = parser.parse_args()
 
     # data dir
@@ -59,11 +59,12 @@ def main():
 
     # init wandb
     lr_name = f"{args.max_lr:.0e}".replace("e-0", "e-").replace("e+0", "e+")
-    warmup_name = f"{args.warmup_steps:.0e}".replace("e-0", "e-").replace("e+0", "e+")
+    warmup_name = f"{args.warmup_steps}"
     wandb.init(
-        project="Tiny GPT with OWT on H100, context len 512, batch size",
+        project="Tiny GPT with OWT on H100, context len 512, full runs",
         config=vars(args),
-        name=f"batch_{args.batch_size}__lr_{lr_name}__warmup_{warmup_name}"
+        name=f"lr_{lr_name}__warmup_{warmup_name}"
+        # name="tiny_try"
     )
 
     # output folder for MyTrainer
