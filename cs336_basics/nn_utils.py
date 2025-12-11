@@ -320,10 +320,10 @@ class MultiHeadSelfAttentionRoPE(nn.Module):
         return self.o_proj(attn)  # (..., seq_len, d_model)
 
 
-def gradient_clipping(parameters: Iterable[torch.nn.Parameter], max_l2_norm: float, eps=1e-6) -> None:
+def gradient_clipping(parameters: Iterable[torch.nn.Parameter], max_l2_norm: float, eps=1e-6) -> float:
     total_norm = torch.sqrt(
         torch.sum(
-            torch.stack([p.grad**2 for p in parameters if p.grad is not None])
+            torch.stack([torch.sum(p.grad**2) for p in parameters if p.grad is not None])
         )
     )
 
@@ -333,6 +333,8 @@ def gradient_clipping(parameters: Iterable[torch.nn.Parameter], max_l2_norm: flo
     for p in parameters:
         if p.grad is not None:
             p.grad.data.mul_(clip_coef)
+
+    return total_norm.item()
 
 
 def top_p_sample(

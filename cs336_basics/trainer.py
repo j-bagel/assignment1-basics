@@ -1,6 +1,7 @@
 from cs336_basics.optimizer import AdamW, learning_rate_scheduler
 from cs336_basics.checkpoint import save_checkpoint
 from cs336_basics.data_loader import get_batch
+from cs336_basics.nn_utils import gradient_clipping
 import torch
 from torch import nn
 from typing import Type
@@ -23,6 +24,7 @@ class MyTrainer:
             batch_size: int,
             context_length: int,
             output_folder: str | os.PathLike,
+            max_grad_l2_norm: float | None = None,
             device=None,
             db=None
     ):
@@ -41,6 +43,7 @@ class MyTrainer:
         self.batch_size = batch_size
         self.context_length = context_length
         self.output_folder = output_folder
+        self.max_grad_l2_norm = max_grad_l2_norm
         self.checkpoints_folder = os.path.join(output_folder, "checkpoints")
         self.device = device
 
@@ -74,6 +77,13 @@ class MyTrainer:
             output = self.model(data)
             loss = self.loss_fn(output, target)
             loss.backward()
+
+            # Compute grad norm BEFORE optimizer step
+            if self.max_grad_l2_norm is not None:
+                grad_norm = gradient_clipping(self.model.parameters(), max_l2_norm=self.max_grad_l2_norm)
+            else:
+                grad_norm = gradient_clipping(self.model.parameters(), max_l2_norm=float("inf"))
+
             self.optimizer.step()
 
             # Update tqdm progress bar
@@ -83,6 +93,7 @@ class MyTrainer:
                 if self.db is not None:
                     self.db.log({
                         "train_loss": loss.item(),
+                        "grad_norm": grad_norm,
                         "global_step": step,
                         "learning_rate": lr
                     })

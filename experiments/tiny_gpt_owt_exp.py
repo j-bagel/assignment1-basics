@@ -17,7 +17,7 @@ def main():
     start_time = time.time()
     parser = argparse.ArgumentParser()
     parser.add_argument('--batch_size', type=int, default=32)
-    parser.add_argument('--max_lr', type=float, default=2e-3)
+    parser.add_argument('--max_lr', type=float, default=3e-3)
     parser.add_argument('--min_lr', type=float, default=2e-5)
     parser.add_argument('--beta_1', type=float, default=0.9)
     parser.add_argument('--beta_2', type=float, default=0.95)
@@ -57,9 +57,9 @@ def main():
     lr_name = f"{args.max_lr:.0e}".replace("e-0", "e-").replace("e+0", "e+")
     warmup_name = f"{args.warmup_ratio:.0e}".replace("e-0", "e-").replace("e+0", "e+")
     wandb.init(
-        project="Tiny GPT with OWT on MPS",
+        project="Tiny GPT with OWT on MPS, grad norm",
         config=vars(args),
-        name=f"lr_{lr_name}__warmup_{warmup_name}__not_tied"
+        name=f"lr_{lr_name}__warmup_{warmup_name}__not_tied_2, clip"
     )
 
     # output folder for MyTrainer
