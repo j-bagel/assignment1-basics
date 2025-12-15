@@ -40,7 +40,7 @@ def main():
     print(f"---- Total number of optimization steps: {max_steps} ----\n")
 
     d_model = 768
-    layers = 6
+    layers = 8
 
     model = TransformerLM(
         vocab_size=32000,
@@ -160,6 +160,6 @@ def main():
 if __name__ == "__main__":
     main()
 
-# Eval Loss: 3.4806
-# Total time: 84.52 minutes
+# Eval Loss: 3.4597
+# Total time: 88.84 minutes
 
