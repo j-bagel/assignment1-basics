@@ -20,13 +20,13 @@ def main():
     start_time = time.time()
     parser = argparse.ArgumentParser()
     parser.add_argument('--batch_size', type=int, default=64)  # 128 will blow H100 (80GB)
-    parser.add_argument('--max_lr', type=float, default=1e-3)
+    parser.add_argument('--max_lr', type=float, default=5e-3)
     parser.add_argument('--min_lr', type=float, default=2e-5)
     parser.add_argument('--beta_1', type=float, default=0.9)
     parser.add_argument('--beta_2', type=float, default=0.95)
-    parser.add_argument('--warmup_steps', type=int, default=200)
+    parser.add_argument('--warmup_steps', type=int, default=1000)
     parser.add_argument('--weight_decay', type=float, default=0.01)
-    parser.add_argument('--total_tokens', type=int, default=int(1.1e9))
+    parser.add_argument('--total_tokens', type=int, default=int(0.82e9))
     args = parser.parse_args()
 
     # data dir
@@ -40,7 +40,7 @@ def main():
     print(f"---- Total number of optimization steps: {max_steps} ----\n")
 
     d_model = 768
-    layers = 6
+    layers = 10
 
     model = TransformerLM(
         vocab_size=32000,
@@ -66,7 +66,7 @@ def main():
     wandb.init(
         project="Tiny GPT with OWT on H100, context len 512, model sizes",
         config=vars(args),
-        name=f"final: lr_{lr_name}__warmup_{warmup_name}__d_model_{d_model}__layers_{layers}__batch_{args.batch_size}"
+        name=f"final_2: lr_{lr_name}__warmup_{warmup_name}__d_model_{d_model}__layers_{layers}__batch_{args.batch_size}"
         # name="tiny_try"
     )
 
